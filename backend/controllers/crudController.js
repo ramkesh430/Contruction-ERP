@@ -1,7 +1,7 @@
 import { pool } from '../config/db.js';
 import { audit } from '../services/audit.js';
 
-const allowedTables = new Set(['clients','suppliers','materials','employees','expenses','equipment']);
+const allowedTables = new Set(['materials']);
 const idField = 'id';
 
 function safeTable(name){ if(!allowedTables.has(name)) throw Object.assign(new Error('Invalid resource'),{status:400}); return name; }

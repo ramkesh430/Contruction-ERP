@@ -1,44 +1,84 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { login, me } from '../controllers/authController.js';
-import { dashboard } from '../controllers/dashboardController.js';
+import { dashboard,listFiscalYears } from '../controllers/dashboardController.js';
+import { globalSearch } from '../controllers/searchController.js';
 import { authenticate, requirePermission } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { list,create,update,softDelete } from '../controllers/crudController.js';
-import { listProjects,createProject,getProject,updateStage,addDailyLog } from '../controllers/projectController.js';
-import { listInvoices,createInvoice,listPayments,createPayment } from '../controllers/billingController.js';
-import { listQuotations,createQuotation,approveQuotation } from '../controllers/quotationController.js';
+import { listExpenses,createExpense,updateExpense,deleteExpense,approveExpense,rejectExpense,uploadBill,listExpenseCategories,createExpenseCategory,updateExpenseCategory,deleteExpenseCategory } from '../controllers/expenseController.js';
+import { listClients,createClient,updateClient,deleteClient,archiveClient,unarchiveClient,getClientDetail,listClientDocuments,addClientDocument,deleteClientDocument } from '../controllers/clientController.js';
+import { listSuppliers,createSupplier,updateSupplier,deleteSupplier,archiveSupplier,unarchiveSupplier,getSupplierDetail,listSupplierDocuments,addSupplierDocument,deleteSupplierDocument } from '../controllers/supplierController.js';
+import { listEmployees,createEmployee,updateEmployee,deleteEmployee,getEmployeeDetail,listEmployeeDocuments,addEmployeeDocument,deleteEmployeeDocument } from '../controllers/employeeController.js';
+import { listEquipment,createEquipment,updateEquipment,deleteEquipment,getEquipmentDetail } from '../controllers/equipmentController.js';
+import { listProjects,createProject,getProject,updateProject,deleteProject,archiveProject,unarchiveProject,updateStage,addDailyLog,listDailyLogs,updateDailyLog,deleteDailyLog,listDocuments,addDocument,deleteDocument,listPhotos,addPhoto,deletePhoto,listVariations,createVariation,updateVariation,deleteVariation } from '../controllers/projectController.js';
+import { listInvoices,getInvoice,createInvoice,updateInvoice,deleteInvoice,listPayments,getPayment,createPayment,updatePayment,deletePayment } from '../controllers/billingController.js';
+import { listQuotations,createQuotation,updateQuotation,deleteQuotation,approveQuotation,rejectQuotation,markSent,getQuotation,duplicateQuotation,convertToProject,listQuotationAttachments,addQuotationAttachment,deleteQuotationAttachment } from '../controllers/quotationController.js';
 import { stock,issue } from '../controllers/inventoryController.js';
-import { listAttendance,markAttendance } from '../controllers/attendanceController.js';
-import { profitReport } from '../controllers/reportController.js';
-import { getSettings,updateSettings } from '../controllers/settingsController.js';
-import { listUsers,createUser,listRoles,listPermissions,setRolePermissions } from '../controllers/userController.js';
-import { listSalaries,processSalary } from '../controllers/salaryController.js';
+import { listCategories,createCategory,updateCategory,deleteCategory,adjustStock,getMaterialLedger } from '../controllers/materialController.js';
+import { listAttendance,markAttendance,updateAttendance,deleteAttendance } from '../controllers/attendanceController.js';
+import { profitReport,profitLossReport,attendanceReport,taxSummaryReport } from '../controllers/reportController.js';
+import { getSettings,updateSettings,uploadLogo,uploadStamp,uploadSignature,uploadQr,createFiscalYear,setCurrentFiscalYear } from '../controllers/settingsController.js';
+import { listUsers,createUser,updateUser,deleteUser,listRoles,createRole,updateRole,deleteRole,listPermissions,setRolePermissions,listAuditLogs } from '../controllers/userController.js';
+import { listSalaries,getSalary,processSalary,updateSalaryRecord,deleteSalaryRecord } from '../controllers/salaryController.js';
+import { listPurchases,getPurchase,createPurchase,updatePurchase,deletePurchase,payPurchase,getSupplierPayment } from '../controllers/purchaseController.js';
+import { listAssignments,createAssignment,returnAssignment,updateAssignment,deleteAssignment,listMaintenance,createMaintenance,updateMaintenance,deleteMaintenance,listRentals,createRental,updateRental,deleteRental } from '../controllers/equipmentOpsController.js';
+import { listAdvances,createAdvance,updateAdvance,deleteAdvance,outstandingAdvance } from '../controllers/advanceController.js';
+import { listNotifications,markNotificationRead,markAllRead } from '../controllers/notificationController.js';
+import { upload } from '../middleware/upload.js';
 
 const r=Router();
 r.post('/auth/login',validate(z.object({email:z.email(),password:z.string().min(6)})),login);
 r.get('/auth/me',authenticate,me);
 r.use(authenticate);
-r.get('/dashboard',dashboard);
+r.get('/dashboard',dashboard);r.get('/fiscal-years',listFiscalYears);r.get('/search',globalSearch);
 
 const resources={
-  clients:['name','contact_person','phone','email','address','pan_vat_no','notes'],
-  suppliers:['name','contact_person','phone','email','address','pan_vat_no','opening_due','notes'],
-  materials:['name','category_id','sku','unit','opening_stock','minimum_stock','default_unit_cost','notes'],
-  employees:['employee_code','name','employee_type','phone','email','address','join_date','salary_type','basic_salary','daily_wage','designation','is_active'],
-  expenses:['project_id','expense_date','expense_type','category_id','description','amount','payment_method','reference_no','bill_file'],
-  equipment:['name','equipment_code','type','purchase_cost','current_value','status','notes']
+  materials:['name','category_id','sku','unit','opening_stock','minimum_stock','default_unit_cost','notes']
 };
 for(const [name,fields] of Object.entries(resources)){
   r.get(`/${name}`,list(name)); r.post(`/${name}`,create(name,fields)); r.put(`/${name}/:id`,update(name,fields)); r.delete(`/${name}/:id`,softDelete(name));
 }
-r.get('/projects',listProjects);r.post('/projects',createProject);r.get('/projects/:id',getProject);r.put('/projects/:id/stages/:stageId',updateStage);r.post('/projects/:id/logs',addDailyLog);
-r.get('/quotations',listQuotations);r.post('/quotations',createQuotation);r.post('/quotations/:id/approve',approveQuotation);
+r.get('/expenses',listExpenses);r.post('/expenses',createExpense);r.put('/expenses/:id',updateExpense);r.delete('/expenses/:id',deleteExpense);
+r.post('/expenses/:id/approve',approveExpense);r.post('/expenses/:id/reject',rejectExpense);r.post('/expenses/:id/bill',upload.single('file'),uploadBill);
+r.get('/expense-categories',listExpenseCategories);r.post('/expense-categories',createExpenseCategory);r.put('/expense-categories/:id',updateExpenseCategory);r.delete('/expense-categories/:id',deleteExpenseCategory);
+r.get('/clients',listClients);r.post('/clients',createClient);r.get('/clients/:id',getClientDetail);r.put('/clients/:id',updateClient);r.delete('/clients/:id',deleteClient);
+r.post('/clients/:id/archive',archiveClient);r.post('/clients/:id/unarchive',unarchiveClient);
+r.get('/clients/:id/documents',listClientDocuments);r.post('/clients/:id/documents',upload.single('file'),addClientDocument);r.delete('/clients/:id/documents/:docId',deleteClientDocument);
+r.get('/suppliers',listSuppliers);r.post('/suppliers',createSupplier);r.get('/suppliers/:id',getSupplierDetail);r.put('/suppliers/:id',updateSupplier);r.delete('/suppliers/:id',deleteSupplier);
+r.post('/suppliers/:id/archive',archiveSupplier);r.post('/suppliers/:id/unarchive',unarchiveSupplier);
+r.get('/suppliers/:id/documents',listSupplierDocuments);r.post('/suppliers/:id/documents',upload.single('file'),addSupplierDocument);r.delete('/suppliers/:id/documents/:docId',deleteSupplierDocument);
+r.get('/employees',listEmployees);r.post('/employees',createEmployee);r.get('/employees/:id',getEmployeeDetail);r.put('/employees/:id',updateEmployee);r.delete('/employees/:id',deleteEmployee);
+r.get('/employees/:id/documents',listEmployeeDocuments);r.post('/employees/:id/documents',upload.single('file'),addEmployeeDocument);r.delete('/employees/:id/documents/:docId',deleteEmployeeDocument);
+r.get('/equipment',listEquipment);r.post('/equipment',createEquipment);r.get('/equipment/:id',getEquipmentDetail);r.put('/equipment/:id',updateEquipment);r.delete('/equipment/:id',deleteEquipment);
+r.get('/projects',listProjects);r.post('/projects',createProject);r.get('/projects/:id',getProject);r.put('/projects/:id',updateProject);r.delete('/projects/:id',deleteProject);r.put('/projects/:id/stages/:stageId',updateStage);
+r.post('/projects/:id/archive',archiveProject);r.post('/projects/:id/unarchive',unarchiveProject);
+r.get('/projects/:id/variations',listVariations);r.post('/projects/:id/variations',createVariation);r.put('/projects/:id/variations/:varId',updateVariation);r.delete('/projects/:id/variations/:varId',deleteVariation);
+r.get('/projects/:id/logs',listDailyLogs);r.post('/projects/:id/logs',addDailyLog);r.put('/projects/:id/logs/:logId',updateDailyLog);r.delete('/projects/:id/logs/:logId',deleteDailyLog);
+r.get('/projects/:id/documents',listDocuments);r.post('/projects/:id/documents',upload.single('file'),addDocument);r.delete('/projects/:id/documents/:docId',deleteDocument);
+r.get('/projects/:id/photos',listPhotos);r.post('/projects/:id/photos',upload.single('file'),addPhoto);r.delete('/projects/:id/photos/:photoId',deletePhoto);
+r.get('/material-purchases',listPurchases);r.post('/material-purchases',createPurchase);r.get('/material-purchases/:id',getPurchase);r.put('/material-purchases/:id',updatePurchase);r.delete('/material-purchases/:id',deletePurchase);r.post('/material-purchases/:id/pay',payPurchase);r.get('/supplier-payments/:id',getSupplierPayment);
+r.get('/equipment-assignments',listAssignments);r.post('/equipment-assignments',createAssignment);r.put('/equipment-assignments/:id',updateAssignment);r.delete('/equipment-assignments/:id',deleteAssignment);r.post('/equipment-assignments/:id/return',returnAssignment);
+r.get('/equipment-maintenance',listMaintenance);r.post('/equipment-maintenance',createMaintenance);r.put('/equipment-maintenance/:id',updateMaintenance);r.delete('/equipment-maintenance/:id',deleteMaintenance);
+r.get('/equipment-rentals',listRentals);r.post('/equipment-rentals',createRental);r.put('/equipment-rentals/:id',updateRental);r.delete('/equipment-rentals/:id',deleteRental);
+r.get('/advances',listAdvances);r.post('/advances',createAdvance);r.put('/advances/:id',updateAdvance);r.delete('/advances/:id',deleteAdvance);r.get('/advances/employee/:employeeId/outstanding',outstandingAdvance);
+r.get('/notifications',listNotifications);r.post('/notifications/:id/read',markNotificationRead);r.post('/notifications/read-all',markAllRead);
+r.get('/quotations',listQuotations);r.post('/quotations',createQuotation);r.get('/quotations/:id',getQuotation);r.put('/quotations/:id',updateQuotation);r.delete('/quotations/:id',deleteQuotation);
+r.post('/quotations/:id/approve',approveQuotation);r.post('/quotations/:id/reject',rejectQuotation);r.post('/quotations/:id/send',markSent);
+r.post('/quotations/:id/duplicate',duplicateQuotation);r.post('/quotations/:id/convert-to-project',convertToProject);
+r.get('/quotations/:id/attachments',listQuotationAttachments);r.post('/quotations/:id/attachments',upload.single('file'),addQuotationAttachment);r.delete('/quotations/:id/attachments/:attId',deleteQuotationAttachment);
 r.get('/materials/stock/summary',stock);r.post('/material-issues',issue);
-r.get('/invoices',listInvoices);r.post('/invoices',createInvoice);r.get('/payments',listPayments);r.post('/payments',createPayment);
-r.get('/attendance',listAttendance);r.post('/attendance',markAttendance);
-r.get('/reports/project-profit',profitReport);
-r.get('/salaries',listSalaries);r.post('/salaries/process',processSalary);
-r.get('/users',listUsers);r.post('/users',createUser);r.get('/roles',listRoles);r.get('/permissions',listPermissions);r.put('/roles/:id/permissions',setRolePermissions);
-r.get('/settings',getSettings);r.put('/settings',updateSettings);
+r.get('/material-categories',listCategories);r.post('/material-categories',createCategory);r.put('/material-categories/:id',updateCategory);r.delete('/material-categories/:id',deleteCategory);
+r.post('/materials/:id/adjust',adjustStock);r.get('/materials/:id/ledger',getMaterialLedger);
+r.get('/invoices',listInvoices);r.post('/invoices',createInvoice);r.get('/invoices/:id',getInvoice);r.put('/invoices/:id',updateInvoice);r.delete('/invoices/:id',deleteInvoice);
+r.get('/payments',listPayments);r.post('/payments',createPayment);r.get('/payments/:id',getPayment);r.put('/payments/:id',updatePayment);r.delete('/payments/:id',deletePayment);
+r.get('/attendance',listAttendance);r.post('/attendance',markAttendance);r.put('/attendance/:id',updateAttendance);r.delete('/attendance/:id',deleteAttendance);
+r.get('/reports/project-profit',profitReport);r.get('/reports/profit-loss',profitLossReport);
+r.get('/reports/attendance',attendanceReport);r.get('/reports/tax-summary',taxSummaryReport);
+r.get('/salaries',listSalaries);r.get('/salaries/:id',getSalary);r.post('/salaries/process',processSalary);r.put('/salaries/:id',updateSalaryRecord);r.delete('/salaries/:id',deleteSalaryRecord);
+r.get('/users',listUsers);r.post('/users',createUser);r.put('/users/:id',updateUser);r.delete('/users/:id',deleteUser);
+r.get('/roles',listRoles);r.post('/roles',createRole);r.put('/roles/:id',updateRole);r.delete('/roles/:id',deleteRole);r.get('/permissions',listPermissions);r.put('/roles/:id/permissions',setRolePermissions);
+r.get('/audit-logs',listAuditLogs);
+r.get('/settings',getSettings);r.put('/settings',updateSettings);r.post('/settings/logo',upload.single('file'),uploadLogo);r.post('/settings/stamp',upload.single('file'),uploadStamp);r.post('/settings/signature',upload.single('file'),uploadSignature);r.post('/settings/qr',upload.single('file'),uploadQr);
+r.post('/fiscal-years',createFiscalYear);r.post('/fiscal-years/:id/set-current',setCurrentFiscalYear);
 export default r;

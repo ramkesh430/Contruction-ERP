@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS fiscal_years (
 
 CREATE TABLE IF NOT EXISTS roles (
   id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, name VARCHAR(80) NOT NULL, description VARCHAR(255),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_role_company_name(company_id,name), FOREIGN KEY(company_id) REFERENCES companies(id)
+  is_deleted TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_role_company_name(company_id,name), FOREIGN KEY(company_id) REFERENCES companies(id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS permissions (
@@ -49,25 +49,50 @@ CREATE TABLE IF NOT EXISTS users (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS clients (
-  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, name VARCHAR(180) NOT NULL, contact_person VARCHAR(150),
-  phone VARCHAR(50), email VARCHAR(150), address VARCHAR(255), pan_vat_no VARCHAR(50), notes TEXT,
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, name VARCHAR(180) NOT NULL, client_type VARCHAR(80), contact_person VARCHAR(150),
+  phone VARCHAR(50), alternate_phone VARCHAR(50), email VARCHAR(150), address VARCHAR(255), billing_address VARCHAR(255), pan_vat_no VARCHAR(50), registration_no VARCHAR(80),
+  opening_balance DECIMAL(18,2) DEFAULT 0, credit_limit DECIMAL(18,2) DEFAULT 0, payment_terms VARCHAR(150), bank_name VARCHAR(150), account_name VARCHAR(150), account_number VARCHAR(80),
+  notes TEXT, is_active TINYINT(1) DEFAULT 1, is_archived TINYINT(1) DEFAULT 0,
   created_by BIGINT UNSIGNED, updated_by BIGINT UNSIGNED, is_deleted TINYINT(1) DEFAULT 0, deleted_at DATETIME, deleted_by BIGINT UNSIGNED,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_clients_company(company_id), FOREIGN KEY(company_id) REFERENCES companies(id)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS client_documents (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, client_id BIGINT UNSIGNED NOT NULL,
+  document_type VARCHAR(100), title VARCHAR(180), file_path VARCHAR(255) NOT NULL,
+  created_by BIGINT UNSIGNED, is_deleted TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(client_id) REFERENCES clients(id)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS projects (
   id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, fiscal_year_id BIGINT UNSIGNED,
-  project_code VARCHAR(50) NOT NULL, project_name VARCHAR(180) NOT NULL, client_id BIGINT UNSIGNED, location VARCHAR(255), description TEXT,
-  start_date_ad DATE, start_date_bs VARCHAR(20), end_date_ad DATE, end_date_bs VARCHAR(20), contract_amount DECIMAL(18,2) DEFAULT 0, estimated_cost DECIMAL(18,2) DEFAULT 0,
-  project_manager_id BIGINT UNSIGNED, status ENUM('Planning','Running','On Hold','Completed','Cancelled') DEFAULT 'Planning', progress_percentage DECIMAL(6,2) DEFAULT 0,
+  project_code VARCHAR(50) NOT NULL, project_name VARCHAR(180) NOT NULL, project_type VARCHAR(80), client_id BIGINT UNSIGNED, location VARCHAR(255), site_address VARCHAR(255), description TEXT,
+  start_date_ad DATE, start_date_bs VARCHAR(20), end_date_ad DATE, end_date_bs VARCHAR(20), actual_end_date_ad DATE, contract_amount DECIMAL(18,2) DEFAULT 0, estimated_cost DECIMAL(18,2) DEFAULT 0,
+  retention_percentage DECIMAL(6,2) DEFAULT 0, warranty_period VARCHAR(80), client_contact_person VARCHAR(150), client_contact_phone VARCHAR(50),
+  project_manager_id BIGINT UNSIGNED, engineer_id BIGINT UNSIGNED, site_supervisor_id BIGINT UNSIGNED, status ENUM('Planning','Running','On Hold','Completed','Cancelled') DEFAULT 'Planning', progress_percentage DECIMAL(6,2) DEFAULT 0,
   billing_amount DECIMAL(18,2) DEFAULT 0, received_amount DECIMAL(18,2) DEFAULT 0, outstanding_amount DECIMAL(18,2) DEFAULT 0,
   material_cost DECIMAL(18,2) DEFAULT 0, labour_cost DECIMAL(18,2) DEFAULT 0, other_cost DECIMAL(18,2) DEFAULT 0, total_expense DECIMAL(18,2) DEFAULT 0,
-  gross_profit DECIMAL(18,2) DEFAULT 0, net_profit DECIMAL(18,2) DEFAULT 0,
+  gross_profit DECIMAL(18,2) DEFAULT 0, net_profit DECIMAL(18,2) DEFAULT 0, is_archived TINYINT(1) DEFAULT 0,
   created_by BIGINT UNSIGNED, updated_by BIGINT UNSIGNED, is_deleted TINYINT(1) DEFAULT 0, deleted_at DATETIME, deleted_by BIGINT UNSIGNED,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_project_code(company_id,project_code), INDEX idx_project_status(company_id,status),
-  FOREIGN KEY(company_id) REFERENCES companies(id), FOREIGN KEY(client_id) REFERENCES clients(id), FOREIGN KEY(project_manager_id) REFERENCES users(id), FOREIGN KEY(fiscal_year_id) REFERENCES fiscal_years(id)
+  FOREIGN KEY(company_id) REFERENCES companies(id), FOREIGN KEY(client_id) REFERENCES clients(id), FOREIGN KEY(project_manager_id) REFERENCES users(id),
+  FOREIGN KEY(engineer_id) REFERENCES users(id), FOREIGN KEY(site_supervisor_id) REFERENCES users(id), FOREIGN KEY(fiscal_year_id) REFERENCES fiscal_years(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS project_variations (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, project_id BIGINT UNSIGNED NOT NULL,
+  variation_no VARCHAR(50), variation_date DATE, description VARCHAR(255), variation_type ENUM('Addition','Deduction') DEFAULT 'Addition',
+  amount DECIMAL(18,2) DEFAULT 0, status ENUM('Pending','Approved','Rejected') DEFAULT 'Pending', remarks TEXT,
+  created_by BIGINT UNSIGNED, is_deleted TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(project_id) REFERENCES projects(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS project_payment_terms (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, project_id BIGINT UNSIGNED NOT NULL,
+  milestone_name VARCHAR(150) NOT NULL, percentage DECIMAL(6,2) DEFAULT 0, sort_order INT DEFAULT 0,
+  FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS project_members (
@@ -92,7 +117,7 @@ CREATE TABLE IF NOT EXISTS project_progress (
 CREATE TABLE IF NOT EXISTS project_daily_logs (
   id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, project_id BIGINT UNSIGNED NOT NULL, log_date DATE NOT NULL,
   weather VARCHAR(100), today_work TEXT, worker_count INT DEFAULT 0, materials_used TEXT, equipment_used TEXT, work_progress DECIMAL(6,2) DEFAULT 0,
-  problems_delays TEXT, tomorrow_plan TEXT, engineer_remarks TEXT, created_by BIGINT UNSIGNED,
+  problems_delays TEXT, tomorrow_plan TEXT, engineer_remarks TEXT, created_by BIGINT UNSIGNED, is_deleted TINYINT(1) DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, FOREIGN KEY(project_id) REFERENCES projects(id)
 ) ENGINE=InnoDB;
 
@@ -109,16 +134,30 @@ CREATE TABLE IF NOT EXISTS project_photos (
 
 CREATE TABLE IF NOT EXISTS quotations (
   id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, fiscal_year_id BIGINT UNSIGNED, quotation_no VARCHAR(50) NOT NULL,
-  quotation_date DATE NOT NULL, client_id BIGINT UNSIGNED, title VARCHAR(180), subtotal DECIMAL(18,2) DEFAULT 0, discount DECIMAL(18,2) DEFAULT 0,
-  taxable_amount DECIMAL(18,2) DEFAULT 0, vat_rate DECIMAL(6,2) DEFAULT 0, vat_amount DECIMAL(18,2) DEFAULT 0, grand_total DECIMAL(18,2) DEFAULT 0,
-  status ENUM('Draft','Sent','Approved','Rejected','Expired','Converted') DEFAULT 'Draft', valid_until DATE, notes TEXT, approved_by BIGINT UNSIGNED, approved_at DATETIME,
+  quotation_date DATE NOT NULL, client_id BIGINT UNSIGNED, project_id BIGINT UNSIGNED, title VARCHAR(180), reference_no VARCHAR(100), scope_of_work TEXT,
+  site_location VARCHAR(255), contact_person VARCHAR(150), contact_phone VARCHAR(50),
+  subtotal DECIMAL(18,2) DEFAULT 0, discount DECIMAL(18,2) DEFAULT 0, discount_type ENUM('Percentage','Fixed') DEFAULT 'Fixed', discount_value DECIMAL(18,2) DEFAULT 0,
+  taxable_amount DECIMAL(18,2) DEFAULT 0, vat_rate DECIMAL(6,2) DEFAULT 0, vat_enabled TINYINT(1) DEFAULT 1, vat_amount DECIMAL(18,2) DEFAULT 0, grand_total DECIMAL(18,2) DEFAULT 0,
+  status ENUM('Draft','Sent','Approved','Rejected','Expired','Converted') DEFAULT 'Draft', valid_until DATE, notes TEXT, terms_conditions TEXT, approved_by BIGINT UNSIGNED, approved_at DATETIME,
   created_by BIGINT UNSIGNED, is_deleted TINYINT(1) DEFAULT 0, deleted_at DATETIME, deleted_by BIGINT UNSIGNED, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_quotation_no(company_id,quotation_no), FOREIGN KEY(client_id) REFERENCES clients(id)
+  UNIQUE KEY uq_quotation_no(company_id,quotation_no), FOREIGN KEY(client_id) REFERENCES clients(id), FOREIGN KEY(project_id) REFERENCES projects(id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS quotation_items (
   id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, quotation_id BIGINT UNSIGNED NOT NULL, category VARCHAR(120), description VARCHAR(255) NOT NULL,
   unit VARCHAR(30), quantity DECIMAL(18,3) DEFAULT 0, rate DECIMAL(18,2) DEFAULT 0, amount DECIMAL(18,2) DEFAULT 0, sort_order INT DEFAULT 0,
+  FOREIGN KEY(quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS quotation_payment_terms (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, quotation_id BIGINT UNSIGNED NOT NULL,
+  milestone_name VARCHAR(150) NOT NULL, percentage DECIMAL(6,2) DEFAULT 0, sort_order INT DEFAULT 0,
+  FOREIGN KEY(quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS quotation_attachments (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, quotation_id BIGINT UNSIGNED NOT NULL,
+  file_name VARCHAR(255), file_path VARCHAR(255) NOT NULL, is_deleted TINYINT(1) DEFAULT 0, created_by BIGINT UNSIGNED, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
@@ -135,9 +174,15 @@ CREATE TABLE IF NOT EXISTS boq_items (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS suppliers (
-  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, name VARCHAR(180) NOT NULL, contact_person VARCHAR(150), phone VARCHAR(50), email VARCHAR(150), address VARCHAR(255), pan_vat_no VARCHAR(50), opening_due DECIMAL(18,2) DEFAULT 0, notes TEXT,
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, name VARCHAR(180) NOT NULL, contact_person VARCHAR(150), phone VARCHAR(50), email VARCHAR(150), address VARCHAR(255), pan_vat_no VARCHAR(50), opening_due DECIMAL(18,2) DEFAULT 0, notes TEXT, is_archived TINYINT(1) DEFAULT 0,
   created_by BIGINT UNSIGNED, updated_by BIGINT UNSIGNED, is_deleted TINYINT(1) DEFAULT 0, deleted_at DATETIME, deleted_by BIGINT UNSIGNED, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY(company_id) REFERENCES companies(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS supplier_documents (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, supplier_id BIGINT UNSIGNED NOT NULL,
+  document_type VARCHAR(80), title VARCHAR(180), file_path VARCHAR(255), created_by BIGINT UNSIGNED, is_deleted TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(supplier_id) REFERENCES suppliers(id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS material_categories (
@@ -161,6 +206,13 @@ CREATE TABLE IF NOT EXISTS material_purchases (
 CREATE TABLE IF NOT EXISTS material_purchase_items (
   id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, material_purchase_id BIGINT UNSIGNED NOT NULL, material_id BIGINT UNSIGNED NOT NULL,
   quantity DECIMAL(18,3) NOT NULL, unit_cost DECIMAL(18,2) NOT NULL, amount DECIMAL(18,2) NOT NULL, FOREIGN KEY(material_purchase_id) REFERENCES material_purchases(id) ON DELETE CASCADE, FOREIGN KEY(material_id) REFERENCES materials(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS supplier_payments (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, supplier_id BIGINT UNSIGNED NOT NULL, material_purchase_id BIGINT UNSIGNED,
+  payment_date DATE NOT NULL, amount DECIMAL(18,2) NOT NULL, payment_method VARCHAR(50) DEFAULT 'Cash', reference_no VARCHAR(100), remarks VARCHAR(255),
+  created_by BIGINT UNSIGNED, is_deleted TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(supplier_id) REFERENCES suppliers(id), FOREIGN KEY(material_purchase_id) REFERENCES material_purchases(id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS material_issues (
@@ -193,6 +245,12 @@ CREATE TABLE IF NOT EXISTS labours (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(employee_id) REFERENCES employees(id)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS employee_documents (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, employee_id BIGINT UNSIGNED NOT NULL,
+  document_type VARCHAR(80), title VARCHAR(180), file_path VARCHAR(255), created_by BIGINT UNSIGNED, is_deleted TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(employee_id) REFERENCES employees(id)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS attendance (
   id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, employee_id BIGINT UNSIGNED NOT NULL, project_id BIGINT UNSIGNED,
   attendance_date DATE NOT NULL, status ENUM('Present','Absent','Half Day','Leave','Holiday','Site Visit') NOT NULL,
@@ -220,7 +278,8 @@ CREATE TABLE IF NOT EXISTS expense_categories (
 CREATE TABLE IF NOT EXISTS expenses (
   id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, company_id BIGINT UNSIGNED NOT NULL, project_id BIGINT UNSIGNED, fiscal_year_id BIGINT UNSIGNED, category_id BIGINT UNSIGNED,
   expense_date DATE NOT NULL, expense_type ENUM('Material','Labour','Transport','Fuel','Equipment','Food','Office','Miscellaneous','Other') NOT NULL, description VARCHAR(255), amount DECIMAL(18,2) NOT NULL,
-  payment_method VARCHAR(50), reference_no VARCHAR(100), bill_file VARCHAR(255), approved_by BIGINT UNSIGNED, approved_at DATETIME,
+  status ENUM('Pending','Approved','Rejected') DEFAULT 'Pending',
+  payment_method VARCHAR(50), reference_no VARCHAR(100), paid_by VARCHAR(150), bill_file VARCHAR(255), approved_by BIGINT UNSIGNED, approved_at DATETIME,
   created_by BIGINT UNSIGNED, updated_by BIGINT UNSIGNED, is_deleted TINYINT(1) DEFAULT 0, deleted_at DATETIME, deleted_by BIGINT UNSIGNED, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY(project_id) REFERENCES projects(id), FOREIGN KEY(category_id) REFERENCES expense_categories(id)
 ) ENGINE=InnoDB;

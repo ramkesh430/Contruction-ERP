@@ -1,1 +1,2 @@
-export default function ComingSoonPage({title}){return <><div className="page-head"><div><h1>{title}</h1><p>This module is scaffolded for the next implementation pass.</p></div></div><div className="panel placeholder"><div>🏗️</div><h2>{title}</h2><p>Database structure is ready. Add module-specific workflow and permissions here.</p></div></>}
+import { Construction } from 'lucide-react';
+export default function ComingSoonPage({title}){return <><div className="page-head"><div><h1>{title}</h1><p>This module is scaffolded for the next implementation pass.</p></div></div><div className="panel placeholder"><div><Construction size={46} strokeWidth={1.5}/></div><h2>{title}</h2><p>Database structure is ready. Add module-specific workflow and permissions here.</p></div></>}
