@@ -4,3 +4,7 @@ uploads/*
 !uploads/.gitkeep
 dist/
 *.log
+
+# uploaded files live outside the repo (pattern below is path-anchored)
+backend/uploads/*
+!backend/uploads/.gitkeep

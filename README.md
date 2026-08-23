@@ -97,3 +97,31 @@ Before production, complete these areas:
 
 ## Phase 2 Ready Database Tables
 Equipment rental/maintenance, notifications, project documents/photos and SaaS-friendly `company_id` isolation are already included in the schema for extension.
+
+## Deployment
+
+### Frontend (Vercel)
+The React app deploys to Vercel as a static Vite build. In the Vercel project settings
+set **Root Directory** to `frontend`; [frontend/vercel.json](frontend/vercel.json)
+supplies the build command, output directory, and the SPA rewrite that keeps deep
+links such as `/projects/10` working on refresh.
+
+Set one environment variable in Vercel:
+
+```
+VITE_API_URL=https://<your-api-host>/api
+```
+
+Until that host exists, the deployed site renders the login page but cannot sign in —
+a browser on HTTPS will not call an API on `http://localhost`.
+
+### Backend (not Vercel)
+The API needs a host with a persistent filesystem and long-lived database
+connections. Vercel's serverless runtime provides neither, so use Railway, Render,
+Fly.io or a VPS, together with managed MySQL.
+
+Two things must change before the backend runs anywhere but a single always-on box:
+- `middleware/upload.js` writes to local disk. On any host with an ephemeral or
+  multi-instance filesystem, move uploads to object storage (S3, R2, Vercel Blob).
+- Set `FRONTEND_URL` to the deployed Vercel origin so CORS allows it, and set a
+  strong `JWT_SECRET`.
