@@ -1,0 +1,37 @@
+# Render blueprint for the Construction ERP API (free instance type).
+# Create the Aiven MySQL database first, then set the DB_* values marked
+# sync:false in the Render dashboard — they are secrets and are not stored here.
+services:
+  - type: web
+    name: construction-erp-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_SSL
+        value: "true"
+      # Set these in the Render dashboard from the Aiven connection details.
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSL_CA
+        sync: false
+      # The Vercel origin, e.g. https://construction-erp.vercel.app (no trailing slash).
+      - key: FRONTEND_URL
+        sync: false

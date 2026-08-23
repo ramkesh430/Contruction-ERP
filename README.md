@@ -100,28 +100,72 @@ Equipment rental/maintenance, notifications, project documents/photos and SaaS-f
 
 ## Deployment
 
-### Frontend (Vercel)
-The React app deploys to Vercel as a static Vite build. In the Vercel project settings
-set **Root Directory** to `frontend`; [frontend/vercel.json](frontend/vercel.json)
+A working free-tier stack, verified August 2026:
+
+| Layer | Host | Free tier |
+|---|---|---|
+| Frontend | Vercel | Static Vite build, no card |
+| Backend | Render | 750 instance-hours/month, no card, sleeps after 15 min idle |
+| Database | Aiven MySQL | 1 GB storage, 1 GB RAM, no card |
+
+Deploy in this order — the backend needs the database URL, and the frontend
+needs the backend URL.
+
+### 1. Database (Aiven)
+
+Create a free MySQL service at [aiven.io](https://aiven.io/free-mysql-database).
+From the service overview take the host, port, database name, user and password,
+and download the **CA certificate**.
+
+Import the schema and seed over TLS:
+
+```bash
+mysql --host=<host> --port=<port> --user=avnadmin --password=<password> \
+  --ssl-ca=./ca.pem defaultdb < database/schema.sql
+```
+
+Then run the seed the same way with `database/seed.sql`, and create the admin
+user by running `npm run seed` in `backend/` with the Aiven values in `.env`.
+
+### 2. Backend (Render)
+
+[render.yaml](render.yaml) at the repo root is a blueprint — point Render at
+this repository and it configures the service, generates `JWT_SECRET`, and sets
+`healthCheckPath` to `/api/health`. Fill in the values marked `sync: false` in
+the dashboard from the Aiven connection details, plus:
+
+- `DB_SSL=true` (already in the blueprint) — Aiven refuses plaintext connections
+- `DB_SSL_CA` — paste the contents of `ca.pem`
+- `FRONTEND_URL` — your Vercel origin, no trailing slash
+
+Confirm with `curl https://<your-service>.onrender.com/api/health`, which should
+return `{"ok":true,"database":true}`.
+
+### 3. Frontend (Vercel)
+
+Set **Root Directory** to `frontend`; [frontend/vercel.json](frontend/vercel.json)
 supplies the build command, output directory, and the SPA rewrite that keeps deep
 links such as `/projects/10` working on refresh.
 
-Set one environment variable in Vercel:
+Set one environment variable **before the first build**:
 
 ```
-VITE_API_URL=https://<your-api-host>/api
+VITE_API_URL=https://<your-service>.onrender.com/api
 ```
 
-Until that host exists, the deployed site renders the login page but cannot sign in —
-a browser on HTTPS will not call an API on `http://localhost`.
+`VITE_*` variables are inlined at build time, not read at runtime. Changing it
+later has no effect until you redeploy.
 
-### Backend (not Vercel)
-The API needs a host with a persistent filesystem and long-lived database
-connections. Vercel's serverless runtime provides neither, so use Railway, Render,
-Fly.io or a VPS, together with managed MySQL.
+### Free-tier limitations that will bite
 
-Two things must change before the backend runs anywhere but a single always-on box:
-- `middleware/upload.js` writes to local disk. On any host with an ephemeral or
-  multi-instance filesystem, move uploads to object storage (S3, R2, Vercel Blob).
-- Set `FRONTEND_URL` to the deployed Vercel origin so CORS allows it, and set a
-  strong `JWT_SECRET`.
+- **Uploads do not survive.** Render's free instances have an ephemeral
+  filesystem and cannot mount a persistent disk, so everything `multer` writes
+  to `backend/uploads` — company logo, expense bills, project photos, client and
+  employee documents — is deleted on every redeploy, restart and wake-from-sleep.
+  Fixing this properly means moving `middleware/upload.js` to object storage
+  (Cloudinary and Supabase Storage both have free tiers).
+- **First request after idle takes ~1 minute.** Render sleeps a free service
+  after 15 minutes without traffic. Aiven likewise powers off an idle free
+  database. Expect the login page to hang on the first visit of the day.
+- **1 GB of database storage** is ample for records but not for scanned
+  documents — another reason to keep files out of MySQL and off the app disk.
