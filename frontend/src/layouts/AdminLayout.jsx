@@ -3,8 +3,13 @@ import { useEffect,useRef,useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { Home,Building2,User,FileText,Package,Truck,Users,ShieldCheck,Wallet,Receipt,ReceiptText,CreditCard,Wrench,BarChart3,Shield,Settings as SettingsIcon,ChevronRight,LogOut,Bell,Menu,Search } from 'lucide-react';
+// Fourth element is the permission code required to see this nav item, or
+// null if every logged-in user should see it regardless of role. Matches
+// the codes now enforced server-side in backend/routes/index.js — a user
+// without the permission would get a 403 from the API anyway, so hiding
+// the link here just avoids sending them to a page that can't load.
 const items=[
-['/',Home,'Dashboard'],['/projects',Building2,'Projects'],['/clients',User,'Clients'],['/quotations',FileText,'Quotation / BOQ'],['/materials',Package,'Materials'],['/suppliers',Truck,'Suppliers'],['/employees',Users,'Employees / Labour'],['/attendance',ShieldCheck,'Attendance'],['/salary',Wallet,'Salary'],['/expenses',Receipt,'Expenses'],['/invoices',ReceiptText,'Invoice / Billing'],['/payments',CreditCard,'Payments / Receipts'],['/equipment',Wrench,'Equipment'],['/reports',BarChart3,'Reports'],['/users',Shield,'Users / Roles'],['/settings',SettingsIcon,'Settings']
+['/',Home,'Dashboard',null],['/projects',Building2,'Projects','projects.view'],['/clients',User,'Clients','clients.view'],['/quotations',FileText,'Quotation / BOQ','quotation.view'],['/materials',Package,'Materials','materials.view'],['/suppliers',Truck,'Suppliers','suppliers.view'],['/employees',Users,'Employees / Labour','employees.view'],['/attendance',ShieldCheck,'Attendance','attendance.manage'],['/salary',Wallet,'Salary','salary.view'],['/expenses',Receipt,'Expenses','expenses.view'],['/invoices',ReceiptText,'Invoice / Billing','invoice.view'],['/payments',CreditCard,'Payments / Receipts','payments.view'],['/equipment',Wrench,'Equipment','equipment.view'],['/reports',BarChart3,'Reports','reports.view'],['/users',Shield,'Users / Roles','users.manage'],['/settings',SettingsIcon,'Settings','settings.manage']
 ];
 function timeAgo(iso){
   const s=Math.floor((Date.now()-new Date(iso).getTime())/1000);
@@ -69,6 +74,7 @@ function GlobalSearch(){
 }
 export default function AdminLayout(){
   const [mini,setMini]=useState(false);const [mobileOpen,setMobileOpen]=useState(false);const {user,logout}=useAuth();const loc=useLocation();
+  const visibleItems=items.filter(([,,,perm])=>!perm||user?.permissions?.includes(perm));
   const [currentFY,setCurrentFY]=useState('');
   useEffect(()=>{api.get('/fiscal-years').then(r=>{const cur=r.data.find(y=>y.is_current);setCurrentFY(cur?(cur.name||cur.code):'')}).catch(()=>{})},[]);
   useEffect(()=>{setMobileOpen(false)},[loc.pathname]);
@@ -77,7 +83,7 @@ export default function AdminLayout(){
     {mobileOpen&&<div className="mobile-backdrop" onClick={()=>setMobileOpen(false)}/>}
     <aside className={`sidebar ${mobileOpen?'mobile-open':''}`}>
       <div className="brand"><img src="/logo.jpg" alt="CivilArch Design Space" className="brandmark"/><div><strong>CivilArch</strong><span>Design Space</span></div></div>
-      <nav>{items.map(([to,Icon,label])=><NavLink key={to} to={to} end={to==='/' } title={label}><span className="nav-icon"><Icon size={19} strokeWidth={1.8}/></span><span className="nav-label">{label}</span><ChevronRight size={15} className="nav-chevron"/></NavLink>)}
+      <nav>{visibleItems.map(([to,Icon,label])=><NavLink key={to} to={to} end={to==='/' } title={label}><span className="nav-icon"><Icon size={19} strokeWidth={1.8}/></span><span className="nav-label">{label}</span><ChevronRight size={15} className="nav-chevron"/></NavLink>)}
         <button className="nav-logout" onClick={logout} title="Logout"><span className="nav-icon"><LogOut size={19} strokeWidth={1.8}/></span><span className="nav-label">Logout</span></button>
       </nav>
     </aside>

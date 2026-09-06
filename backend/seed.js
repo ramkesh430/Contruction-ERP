@@ -2,7 +2,12 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { pool } from './config/db.js';
 
-const permissions=['projects.view','projects.create','projects.edit','projects.delete','clients.view','clients.create','clients.edit','quotation.view','quotation.create','quotation.approve','expenses.view','expenses.create','expenses.approve','invoice.view','invoice.create','invoice.approve','payments.view','payments.create','attendance.manage','salary.view','salary.process','reports.view','users.manage','settings.manage'];
+const permissions=['projects.view','projects.create','projects.edit','projects.delete','clients.view','clients.create','clients.edit','quotation.view','quotation.create','quotation.approve','expenses.view','expenses.create','expenses.approve','invoice.view','invoice.create','invoice.approve','payments.view','payments.create','attendance.manage','salary.view','salary.process','reports.view','users.manage','settings.manage',
+  // Modules that previously had no permission codes at all, so their routes
+  // could not be gated by role — added so every module in the sidebar has
+  // real, assignable RBAC coverage, same view/manage granularity as the
+  // areas above that only ever needed one or two codes.
+  'suppliers.view','suppliers.manage','employees.view','employees.manage','equipment.view','equipment.manage','materials.view','materials.manage','purchases.view','purchases.manage','advances.view','advances.manage'];
 async function run(){
   await pool.query(`INSERT IGNORE INTO companies(id,name,email,phone,address,pan_vat_no) VALUES(1,'Next Level Construction Pvt. Ltd.','admin@construction.local','9800000000','Bhairahawa, Nepal','')`);
   await pool.query(`INSERT IGNORE INTO company_settings(company_id,vat_enabled,vat_rate,currency,invoice_prefix,quotation_prefix,project_prefix) VALUES(1,1,13,'NPR','INV','QT','PRJ')`);

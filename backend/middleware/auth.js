@@ -22,7 +22,12 @@ export async function authenticate(req, res, next) {
   }
 }
 
-export async function requirePermission(code) {
+// Not async: this returns the middleware function itself, synchronously.
+// Marking it `async` (as before) made every call return a Promise instead
+// of a function — Express would have thrown "argument handler must be a
+// function" the moment any route actually tried to use it, which is
+// exactly why no route ever did.
+export function requirePermission(code) {
   return async (req, res, next) => {
     try {
       if (req.user?.role_name === 'Super Admin') return next();
